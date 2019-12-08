@@ -47,7 +47,7 @@ def google(email, proxy):
     result=""
     email=email.strip()
     print("New request :",email)
-    if "hotmail" in email or "live" in email and "@" in email:
+    if "hotmail" in email or "live" in email or 'outlook'in email and "@" in email:
         driver=webdriver.Chrome("chromedriver.exe", chrome_options=chrome_options)
         url ="""https://login.live.com/login.srf?wa=wsignin1.0&rpsnv=13&ct=1565967985&rver=7.0.6738.0&wp=MBI_SSL&wreply=https:%2F%2Faccount.microsoft.com%2Fauth%2Fcomplete-signin%3Fru%3Dhttps%253A%252F%252Faccount.microsoft.com%252F%253Frefp%253Dsignedout-index%2526refd%253Dwww.google.com&lc=2057&id=292666&lw=1&fl=easi2 """
         driver.get(url)
@@ -72,7 +72,7 @@ def google(email, proxy):
             print("Missing, or proxy ip is not connected",email)
             result="Proxy ip not connected, retry"
 
-    elif "yahoo" in email and "@" in email:
+    elif "yahoo" in email or 'rocketmail' in email or 'ymail' in email and "@" in email:
         driver=webdriver.Chrome("chromedriver.exe", chrome_options=chrome_options)
         url ="""https://login.yahoo.com/"""
         driver.get(url)
@@ -269,7 +269,7 @@ def get_file():
     #         writer.writerow([rst[1].strip() ,rst[0]])
     return {"data":final_data}
 
-@app.route('/email/', methods=['POST'])
+@app.route('/email/', methods=['POST','GET'])
 def get_email():
     email=request.args.get("email")
     token="Vf8gk0KEOcuxlLnP8dZ6ww"
@@ -293,4 +293,4 @@ def get_email():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=80, threaded=True, debug=True)
+    app.run(host="0.0.0.0", port=8080, threaded=True, debug=True)
