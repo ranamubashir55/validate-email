@@ -73,7 +73,13 @@ def google(email, proxy):
             result="Proxy ip not connected, retry"
 
     elif "yahoo" in email or 'rocketmail' in email or 'ymail' in email and "@" in email:
-        driver=webdriver.Chrome("chromedriver.exe", chrome_options=chrome_options)
+        prox = Proxy()
+        prox.proxy_type = ProxyType.MANUAL
+        prox.http_proxy = proxy
+        capabilities = webdriver.DesiredCapabilities.CHROME
+        prox.add_to_capabilities(capabilities)
+        driver = webdriver.Chrome(desired_capabilities=capabilities)
+
         url ="""https://login.yahoo.com/"""
         driver.get(url)
         print("Checking email", email)
@@ -83,10 +89,11 @@ def google(email, proxy):
             try:
                 time.sleep(1)
                 input_email.send_keys(Keys.ENTER)
+                time.sleep(1)
             except Exception:
                 pass
             try:    
-                verify = WebDriverWait(driver, 7).until(EC.presence_of_all_elements_located((By.ID,"login-passwd")))
+                verify = WebDriverWait(driver, 8).until(EC.presence_of_all_elements_located((By.ID,"login-passwd")))
                 if verify:
                     print("verified::::::::::::::",email)
                     result="Valid Email"
