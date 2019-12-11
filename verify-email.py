@@ -16,7 +16,8 @@ import urllib.request
 from io import StringIO
 import secrets
 app = Flask(__name__)
-
+import threading
+import queue
 # token = secrets.token_urlsafe(16)
 
 
@@ -39,10 +40,11 @@ def get_proxy():
     return proxy
 
 
-def google(email, proxy):
+def google(email, proxy, que=None):
     chrome_options = webdriver.ChromeOptions()
     prefs = {"profile.managed_default_content_settings.images": 2}
     chrome_options.add_experimental_option("prefs", prefs)
+    chrome_options.add_argument('--headless')
     driver=""
     result=""
     email=email.strip()
@@ -78,7 +80,7 @@ def google(email, proxy):
         prox.http_proxy = proxy
         capabilities = webdriver.DesiredCapabilities.CHROME
         prox.add_to_capabilities(capabilities)
-        driver = webdriver.Chrome(desired_capabilities=capabilities)
+        driver = webdriver.Chrome(desired_capabilities=capabilities, chrome_options=chrome_options)
 
         url ="""https://login.yahoo.com/"""
         driver.get(url)
@@ -116,7 +118,7 @@ def google(email, proxy):
         prox.http_proxy = proxy
         capabilities = webdriver.DesiredCapabilities.CHROME
         prox.add_to_capabilities(capabilities)
-        driver = webdriver.Chrome(desired_capabilities=capabilities)
+        driver = webdriver.Chrome(desired_capabilities=capabilities, chrome_options=chrome_options)
         driver.get("https://login.aol.com/")
         print("Checking email", email)
         try:
@@ -151,7 +153,7 @@ def google(email, proxy):
         driver.get(url)
         print("Checking email", email)
         try:
-            input_email = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID,"identifierId")))
+            input_email = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID,"Email")))  #identifierId
             input_email.send_keys(email)
             try:
                 time.sleep(1)
@@ -159,7 +161,7 @@ def google(email, proxy):
             except Exception:
                 pass
             try:    
-                verify = WebDriverWait(driver, 7).until(EC.presence_of_all_elements_located((By.NAME,"password")))
+                verify = WebDriverWait(driver, 7).until(EC.presence_of_all_elements_located((By.ID,"Passwd")))   #Name=>password
                 if verify:
                     print("verified::::::::::::::",email)
                     result="Valid Email"
@@ -176,7 +178,7 @@ def google(email, proxy):
         prox.http_proxy = proxy
         capabilities = webdriver.DesiredCapabilities.CHROME
         prox.add_to_capabilities(capabilities)
-        driver = webdriver.Chrome(desired_capabilities=capabilities)
+        driver = webdriver.Chrome(desired_capabilities=capabilities, chrome_options=chrome_options)
         url ="""https://accounts.zoho.com/signin?servicename=VirtualOffice&signupurl=https://www.zoho.com/mail/zohomail-pricing.html&serviceurl=https://mail.zoho.com"""
         driver.get(url)
         print("Checking email", email)
@@ -234,46 +236,56 @@ def google(email, proxy):
         result="Invalid Email"
     if driver:
         driver.quit()
-    return {"status":result,"email":email}
+    if que:
+        que.put({"status":result,"email":email})
+    if que==None:
+        return {"status":result,"email":email}
 
 @app.route('/mails/', methods=['POST','GET'])
 def get_file():
     final_data=[]
+    threads=[]
     token="Vf8gk0KEOcuxlLnP8dZ6ww"
-    # mail_list=str(request.args.get("list"))
     data=request.get_json()
     key=request.args.get("key")
     if key!=token:
         return "Invalid API Key"
-    # mails=mail_list.split(",")
+    
     print(data['data'])
-    # try:
-    #     response = urlopen(path).read().decode('ascii','ignore')
-    #     datafile= StringIO(response)
-    #     mails = csv.reader(datafile)
-    # except Exception:
-    #     return "No file found, or invalid format"
+    q = queue.Queue()
+
+    th_count=0
     for email in data.get('data'):
-        # email=email.replace("[","").replace("]","")
         proxy=get_proxy()
         if email:
-            result = google(email, proxy)
+            t = threading.Thread(target=google, args=(email, proxy, q))
+            t.start()
+            threads.append(t)
+            th_count=+1
+
+        if th_count==20:
+            for process in threads:
+                process.join()
+            th_count=0
+
+    for process in threads:
+        process.join()
+
+    while not q.empty():
+        result = q.get()
         c=1
         if "retry" in result:
             while True:
                 proxy=get_proxy()
-                result = google(email, proxy)
+                t = threading.Thread(target=google, args=(email, proxy, q))
+                t.start()
+                t.join()
+                result = q.get()
                 if not "retry" in result or "invalid Email" in result or "Valid Email" in result or c==3:
                     break
                 c=c+1
         final_data.append(result)
-    # no=random.randint(5,123456890)  
-    # file_path = "output/result-list"+str(no)+".csv"
-    # for x in final_data:
-    #     with open(file_path,mode='a') as output_file:
-    #         writer = csv.writer(output_file, delimiter=",", quoting=csv.QUOTE_MINIMAL)
-    #         rst = x.split("-")
-    #         writer.writerow([rst[1].strip() ,rst[0]])
+    
     return {"data":final_data}
 
 @app.route('/email/', methods=['POST','GET'])
@@ -300,4 +312,4 @@ def get_email():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=80, threaded=True, debug=True)
+    app.run(host="0.0.0.0", port=8080, threaded=True, debug=True)
